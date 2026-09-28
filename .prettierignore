@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+test-results
+playwright-report
+public/*.geojson
+public/places.json
+public/world-overview.svg
+docs/catalog-metadata.json
+package-lock.json
