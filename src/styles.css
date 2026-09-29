@@ -2881,119 +2881,6 @@ html.region-pan-active * {
   }
 }
 
-/* Slice mode keeps precision controls separate from direct face manipulation. */
-.slice-explorer {
-  position: absolute;
-  top: 12px;
-  right: 16px;
-  z-index: 3;
-  width: 248px;
-  pointer-events: none;
-}
-.slice-explorer > * {
-  pointer-events: auto;
-}
-.slice-panel {
-  margin-top: 8px;
-  padding: 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: #fffffff5;
-  box-shadow: 0 6px 24px #2833430a;
-}
-.slice-panel-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-}
-.slice-panel-heading .icon {
-  width: 24px;
-  height: 24px;
-  padding: 4px;
-}
-.slice-panel p {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.6;
-  margin: 6px 0 14px;
-}
-.slice-axis-options {
-  display: flex;
-  padding: 3px;
-  background: #f2f4f7;
-  border: 1px solid #edf0f3;
-  border-radius: 6px;
-  margin-bottom: 18px;
-}
-.slice-axis-options button {
-  flex: 1;
-  padding: 6px 3px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  font-size: 10px;
-  color: var(--muted);
-}
-.slice-axis-options button[aria-pressed='true'] {
-  background: white;
-  color: #283343;
-  box-shadow: 0 1px 3px #28334314;
-}
-.slice-position-label {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-}
-.slice-position-label output {
-  font-variant-numeric: tabular-nums;
-}
-.slice-panel input[type='range'] {
-  width: 100%;
-  height: 24px;
-  margin: 8px 0 0;
-  padding: 0;
-  accent-color: #697ca9;
-  cursor: ew-resize;
-  border: 0;
-  box-shadow: none;
-}
-.slice-endpoints {
-  display: flex;
-  justify-content: space-between;
-  font-size: 9px;
-  color: var(--muted);
-}
-.slice-panel-footer {
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.slice-toolbar {
-  width: max-content;
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fffffff2;
-  box-shadow: 0 2px 8px #28334306;
-}
-.slice-toolbar .icon {
-  width: 28px;
-  height: 28px;
-  padding: 6px;
-}
 .slice-instruction {
   position: absolute;
   bottom: 12px;
@@ -3008,14 +2895,6 @@ html.region-pan-active * {
   text-align: center;
   pointer-events: none;
 }
-@media (max-width: 700px) {
-  .slice-explorer {
-    top: 52px;
-    right: 10px;
-    width: 224px;
-  }
-}
-
 /* In Slice mode the rendered face is the target, with no persistent gizmos. */
 .slice-face-surfaces {
   position: absolute;
@@ -3041,9 +2920,6 @@ html.region-pan-active * {
 }
 .slice-face-target:active {
   cursor: grabbing;
-}
-.slice-toolbar > .button {
-  font-size: 11px;
 }
 
 .camera-tools .button[aria-label='Slice'] {
@@ -3075,32 +2951,11 @@ html.region-pan-active * {
   border-radius: 0;
   box-shadow: none;
 }
-.slice-explorer,
 .slice-instruction {
   --muted: #646872;
 }
-.slice-toolbar .icon,
-.slice-panel-heading .icon {
-  width: 32px;
-  height: 32px;
-}
-.slice-axis-options button {
-  min-height: 32px;
-}
-.cube-container {
-  container-type: inline-size;
-}
-@container (max-width: 560px) {
-  .slice-explorer {
-    top: 58px;
-    right: 12px;
-  }
-}
 @media (pointer: coarse) {
-  .camera-tools .button.icon,
-  .slice-toolbar .button,
-  .slice-panel-heading .icon,
-  .slice-axis-options button {
+  .camera-tools .button.icon {
     min-width: 44px;
     min-height: 44px;
   }

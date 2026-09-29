@@ -770,7 +770,7 @@ export function Cube({
         if (
           !e.metaKey ||
           e.button !== 0 ||
-          (e.target as Element).closest('button, [data-slice-surface], .slice-explorer')
+          (e.target as Element).closest('button, [data-slice-surface]')
         )
           return;
         e.preventDefault();

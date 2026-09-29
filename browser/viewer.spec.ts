@@ -302,14 +302,12 @@ test('slices faces directly, cancels drags and returns to navigation', async ({
   await page.keyboard.press('Escape');
   await page.mouse.up();
   await expect(page.locator('.lead-label')).toHaveText('+12 h');
-  await page.getByRole('button', { name: 'Reset all slices', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset cube', exact: true }).click();
   await expect(page).toHaveURL(/slices=%5B2%2C0%2C2%5D/);
-  await page.getByRole('button', { name: 'Precise slice controls' }).click();
-  await page.getByRole('button', { name: 'Longitude', exact: true }).click();
-  await page.getByRole('slider', { name: 'Longitude slice position' }).press('ArrowLeft');
+  await page.getByRole('button', { name: 'Slice', exact: true }).click();
+  await longitudeHandle.press('ArrowLeft');
   await expect(page).toHaveURL(/slices=%5B1%2C0%2C2%5D/);
-  await page.getByRole('button', { name: 'Close slice controls' }).click();
-  await expect(page.getByRole('button', { name: 'Precise slice controls' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Precise slice controls' })).toHaveCount(0);
   await expect(handle).toBeVisible();
   await page.getByRole('button', { name: 'Play timeline', exact: true }).click();
   await handle.press('ArrowLeft');

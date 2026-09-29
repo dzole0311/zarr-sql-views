@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { RotateCcw, Settings2, X } from 'lucide-react';
 import type { OrbitViewport } from '@deck.gl/core';
 import type { Volume } from '../engine/types';
 import { timeLabel } from '../engine/time-labels';
 import { slicePlanes, draggedSliceIndex, type SliceCuts } from '../render/slice-planes';
-import { Button, Tip } from './ui/primitives';
 
 type Cuts = SliceCuts;
 const names = ['Longitude', 'Latitude', 'Time'];
@@ -29,10 +27,8 @@ export function SliceExplorer({
   onExit: () => void;
   onStart: (axis: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [active, setActive] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [axis, setAxis] = useState(0);
   const drag = useRef<{
     pointer: number;
     x: number;
@@ -51,34 +47,18 @@ export function SliceExplorer({
     () => [volume.lon.map((n) => (n - volume.lon[0] + 360) % 360), volume.lat, volume.times],
     [volume],
   );
-  const panel = useRef<HTMLDivElement>(null);
-  const closePanel = () => {
-    setOpen(false);
-    panel.current
-      ?.querySelector<HTMLButtonElement>('[aria-label="Precise slice controls"]')
-      ?.focus();
-  };
-  const restoreSlices = () => {
-    onStart(2);
-    onChange(full);
-  };
-  const values = coordinates[axis];
-  const full: Cuts = [volume.shape[2] - 1, 0, volume.shape[0] - 1];
-  const changed = slices.some((n, i) => n !== full[i]);
   const updateAxis = (axis: number, index: number) => {
     onStart(axis);
     const next = [...slices] as Cuts;
     next[axis] = Math.max(0, Math.min(coordinates[axis].length - 1, index));
     onChange(next);
   };
-  const update = (index: number) => updateAxis(axis, index);
   const labelFor = (axis: number, index: number) => {
     if (axis === 2) return timeLabel(volume.times[index], volume.timeUnits);
     const value = (axis === 0 ? volume.lon : volume.lat)[index];
     const direction = axis === 0 ? (value < 0 ? 'W' : 'E') : value < 0 ? 'S' : 'N';
     return `${Math.abs(value).toFixed(2)}° ${direction}`;
   };
-  const label = (index: number) => labelFor(axis, index);
   const planes = useMemo(
     () => slicePlanes(coordinates, slices, projection),
     [coordinates, slices, projection],
@@ -87,105 +67,6 @@ export function SliceExplorer({
   if (!enabled) return null;
   return (
     <>
-      <div
-        ref={panel}
-        className="slice-explorer"
-        onPointerDown={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            if (open) closePanel();
-            else onExit();
-            e.stopPropagation();
-          }
-        }}
-      >
-        <div className="slice-toolbar">
-          <Tip label="Adjust slice position">
-            <Button
-              variant="ghost"
-              className="icon"
-              aria-label="Precise slice controls"
-              aria-expanded={open}
-              aria-controls="voxel-slice-panel"
-              onClick={() => {
-                setOpen(!open);
-              }}
-            >
-              <Settings2 size={14} aria-hidden="true" />
-            </Button>
-          </Tip>
-          <Tip label="Restore all slices">
-            <Button
-              variant="ghost"
-              className="icon"
-              aria-label="Reset all slices"
-              disabled={!changed || disabled}
-              onClick={restoreSlices}
-            >
-              <RotateCcw size={14} aria-hidden="true" />
-            </Button>
-          </Tip>
-          <Button variant="ghost" onClick={onExit}>
-            Done
-          </Button>
-        </div>
-        {open && (
-          <section
-            id="voxel-slice-panel"
-            className="slice-panel"
-            aria-label="Slice volume controls"
-          >
-            <div className="slice-panel-heading">
-              <strong>Explore the interior</strong>
-              <Button
-                variant="ghost"
-                className="icon"
-                aria-label="Close slice controls"
-                onClick={closePanel}
-              >
-                <X size={14} aria-hidden="true" />
-              </Button>
-            </div>
-            <p>Choose a dimension and adjust its position.</p>
-            <div className="slice-axis-options" role="group" aria-label="Slice plane">
-              {names.map((name, i) => (
-                <button key={name} aria-pressed={axis === i} onClick={() => setAxis(i)}>
-                  {name}
-                </button>
-              ))}
-            </div>
-            <div className="slice-position-label">
-              <label htmlFor="voxel-slice-position">Position</label>
-              <output htmlFor="voxel-slice-position">{label(slices[axis])}</output>
-            </div>
-            <input
-              id="voxel-slice-position"
-              aria-label={`${names[axis]} slice position`}
-              aria-valuetext={label(slices[axis])}
-              type="range"
-              min={0}
-              max={values.length - 1}
-              step={1}
-              value={slices[axis]}
-              disabled={disabled || values.length < 2}
-              onChange={(e) => update(Number(e.target.value))}
-            />
-            <div className="slice-endpoints">
-              <span>{label(0)}</span>
-              <span>{label(values.length - 1)}</span>
-            </div>
-            <div className="slice-panel-footer">
-              <span>
-                {axis === 0
-                  ? 'Keeps the west side'
-                  : axis === 1
-                    ? 'Keeps the north side'
-                    : 'Keeps earlier time steps'}
-              </span>
-            </div>
-          </section>
-        )}
-      </div>
       {!disabled && (
         <div className="slice-instruction" id="slice-instructions">
           {active !== null
@@ -220,7 +101,6 @@ export function SliceExplorer({
                   if (!drag.current) setActive(null);
                 }}
                 onFocus={() => {
-                  setAxis(axis);
                   setActive(axis);
                 }}
                 onBlur={() => {
@@ -229,7 +109,6 @@ export function SliceExplorer({
                 onPointerDown={(e) => {
                   if (e.button !== 0) return;
                   e.stopPropagation();
-                  setAxis(axis);
                   setActive(axis);
                   setDragging(true);
                   e.currentTarget.focus();
