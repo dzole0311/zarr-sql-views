@@ -356,7 +356,7 @@ export default function App() {
 
     const timer = setInterval(
       () => setSlices((s) => [s[0], s[1], (s[2] + 1) % volume.shape[0]]),
-      700,
+      175,
     );
 
     return () => clearInterval(timer);
@@ -416,6 +416,12 @@ export default function App() {
   const updateSlices = (v: [number, number, number]) => {
     warmStart.current = performance.now();
     setSlices(v);
+  };
+
+  const resetCube = () => {
+    setPlaying(false);
+    if (volume) updateSlices([volume.shape[2] - 1, 0, volume.shape[0] - 1]);
+    setReset((n) => n + 1);
   };
 
   const changeSlice = (axis: number, value: number) => {
@@ -721,9 +727,14 @@ export default function App() {
                           volume={volume}
                           points={selectedCells}
                           slices={slices}
+                          onSlices={updateSlices}
+                          onSliceStart={(axis) => {
+                            if (axis === 2) setPlaying(false);
+                          }}
                           range={range}
                           palette={palette}
                           reset={reset}
+                          onReset={resetCube}
                           onPoint={(p) => {
                             setSelectedForecasts((previous) =>
                               addForecastPoint(previous, volume, p.x, p.y),
@@ -942,7 +953,7 @@ export default function App() {
               <Command.Empty>No matching actions.</Command.Empty>
               {[
                 ['Open dataset', () => open({ url: AIFS })],
-                ['Reset camera', () => setReset((n) => n + 1)],
+                ['Reset cube', resetCube],
                 ['Toggle controls', toggleSidebar],
                 ['Toggle point forecast', () => setLinked((v) => !v)],
                 ['Edit region', () => setRegionDialog(true)],

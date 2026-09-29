@@ -98,10 +98,11 @@ test('loads a volume, renders palettes, and applies SQL through the real workers
   await expect(palette).toHaveValue('ember');
   await page.keyboard.press('Escape');
   await page.screenshot({ path: 'test-results/viewer.png' });
-  for (let i = 0; i < 20; i++)
-    await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  const zoomIn = page.getByRole('button', { name: 'Zoom in', exact: true });
+  for (let i = 0; i < 20 && (await zoomIn.isEnabled()); i++) await zoomIn.click();
+  await expect(zoomIn).toBeDisabled();
   await page.screenshot({ path: 'test-results/viewer-close-zoom.png' });
-  await page.getByRole('button', { name: 'Reset camera', exact: true }).click();
+  await page.getByRole('button', { name: 'Reset cube', exact: true }).click();
   expect(errors.filter((message) => !message.includes('404'))).toEqual([]);
 });
 
@@ -234,4 +235,144 @@ test('opens a snowfall URL without a variable and preserves calendar years in SQ
     .fill('SELECT cell_id FROM loaded_forecast WHERE winter = 2024');
   await page.getByRole('button', { name: 'Run query', exact: true }).click();
   await expect(page.locator('.selection-status')).toHaveText('9 cells');
+});
+
+test('slices faces directly, cancels drags and returns to navigation', async ({
+  page,
+  context,
+}) => {
+  const files = fixtureStore();
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.addInitScript(() => localStorage.setItem('zarr-sql-views-tour-v1', 'seen'));
+  await context.route('**/fixture.zarr/**', async (route) => {
+    const data = files.get(new URL(route.request().url()).pathname.split('/fixture.zarr/')[1]);
+    await route.fulfill({
+      status: data === undefined ? 404 : 200,
+      body: data ?? '',
+      contentType: typeof data === 'string' ? 'application/json' : 'application/octet-stream',
+    });
+  });
+  const params = new URLSearchParams({
+    dataset: 'http://127.0.0.1:4175/fixture.zarr',
+    variable: 'temperature_2m',
+    extent: '[0,40,2,42]',
+  });
+  await page.goto(`/?${params}`);
+  await expect(page.getByRole('button', { name: 'Run query', exact: true })).toBeEnabled();
+  const toolbar = page.getByRole('toolbar', { name: 'Cube controls' });
+  const orbit = toolbar.getByRole('button', { name: 'Orbit', exact: true });
+  await orbit.focus();
+  await orbit.press('ArrowRight');
+  await expect(toolbar.getByRole('button', { name: 'Pan', exact: true })).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(toolbar.getByRole('button', { name: 'Place labels', exact: true })).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(orbit).toBeFocused();
+  await expect(toolbar.locator('button[tabindex="0"]')).toHaveCount(1);
+  await expect(page.getByRole('slider', { name: 'Time slice face' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Slice', exact: true }).click();
+  const longitudeHandle = page.getByRole('slider', { name: 'Longitude slice face' });
+  const latitudeHandle = page.getByRole('slider', { name: 'Latitude slice face' });
+  const handle = page.getByRole('slider', { name: 'Time slice face' });
+  await expect(longitudeHandle).toBeVisible();
+  await expect(latitudeHandle).toBeVisible();
+  await expect(handle).toBeVisible();
+  await expect(page.getByRole('slider', { name: 'Longitude slice position' })).toHaveCount(0);
+  await longitudeHandle.press('ArrowLeft');
+  await expect(page).toHaveURL(/slices=%5B1%2C0%2C2%5D/);
+  await latitudeHandle.press('ArrowRight');
+  await expect(page).toHaveURL(/slices=%5B1%2C1%2C2%5D/);
+  await handle.press('ArrowLeft');
+  await expect(page.locator('.lead-label')).toHaveText('+6 h');
+  await page.screenshot({ path: 'test-results/voxel-slice.png' });
+  const box = (await handle.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2 - 150, { steps: 8 });
+  await page.mouse.up();
+  await expect(page.locator('.lead-label')).toHaveText('+12 h');
+  const nextBox = (await handle.boundingBox())!;
+  await page.mouse.move(nextBox.x + nextBox.width / 2, nextBox.y + nextBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(nextBox.x + nextBox.width / 2, nextBox.y + nextBox.height / 2 + 150, {
+    steps: 8,
+  });
+  await expect(page.locator('.lead-label')).toHaveText('+6 h');
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await expect(page.locator('.lead-label')).toHaveText('+12 h');
+  await page.getByRole('button', { name: 'Reset all slices', exact: true }).click();
+  await expect(page).toHaveURL(/slices=%5B2%2C0%2C2%5D/);
+  await page.getByRole('button', { name: 'Precise slice controls' }).click();
+  await page.getByRole('button', { name: 'Longitude', exact: true }).click();
+  await page.getByRole('slider', { name: 'Longitude slice position' }).press('ArrowLeft');
+  await expect(page).toHaveURL(/slices=%5B1%2C0%2C2%5D/);
+  await page.getByRole('button', { name: 'Close slice controls' }).click();
+  await expect(page.getByRole('button', { name: 'Precise slice controls' })).toBeFocused();
+  await expect(handle).toBeVisible();
+  await page.getByRole('button', { name: 'Play timeline', exact: true }).click();
+  await handle.press('ArrowLeft');
+  await expect(page.getByRole('button', { name: 'Play timeline', exact: true })).toBeVisible();
+  await handle.press('Escape');
+  await expect(handle).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Orbit', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  // A controller event used to retain old width/height in camera state. Resizing
+  // then displaced SVG targets from the WebGL faces by half the size change.
+  const cube = page.getByLabel('Interactive forecast cube');
+  const beforeWheel = (await cube.boundingBox())!;
+  await page.mouse.move(
+    beforeWheel.x + beforeWheel.width / 2,
+    beforeWheel.y + beforeWheel.height / 2,
+  );
+  await page.mouse.wheel(0, -40);
+  await page.getByRole('button', { name: 'Slice', exact: true }).click();
+  const center = async () =>
+    handle.evaluate((el) => {
+      const points = (el.getAttribute('points') || '')
+        .split(' ')
+        .map((p) => p.split(',').map(Number));
+      return points.reduce((sum, p) => [sum[0] + p[0] / 4, sum[1] + p[1] / 4], [0, 0]);
+    });
+  const originalCenter = await center();
+  const originalSize = (await cube.boundingBox())!;
+  await page.setViewportSize({ width: 1680, height: 1000 });
+  await expect
+    .poll(async () => {
+      const current = await center();
+      const size = (await cube.boundingBox())!;
+      return Math.abs(current[0] - originalCenter[0] - (size.width - originalSize.width) / 2);
+    })
+    .toBeLessThan(1);
+  await expect
+    .poll(async () => {
+      const current = await center();
+      const size = (await cube.boundingBox())!;
+      return Math.abs(current[1] - originalCenter[1] - (size.height - originalSize.height) / 2);
+    })
+    .toBeLessThan(1);
+  await handle.focus();
+  await page.screenshot({ path: 'test-results/voxel-slice-resized.png' });
+  await page.getByRole('button', { name: 'Reset cube', exact: true }).click();
+  await expect(page).toHaveURL(/slices=%5B2%2C0%2C2%5D/);
+  await expect(handle).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Orbit', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.clock.install({ time: new Date('2026-09-29T12:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-09-29T12:00:01Z'));
+  await page.getByRole('button', { name: 'Play timeline', exact: true }).click();
+  await page.clock.runFor(175);
+  await expect(page.locator('.lead-label')).toHaveText('+0 h');
+  await page.clock.runFor(175);
+  await expect(page.locator('.lead-label')).toHaveText('+6 h');
+  await page.getByRole('button', { name: 'Reset cube', exact: true }).click();
+  await page.clock.runFor(700);
+  await expect(page.locator('.lead-label')).toHaveText('+12 h');
+  await expect(page.getByRole('button', { name: 'Play timeline', exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
 });

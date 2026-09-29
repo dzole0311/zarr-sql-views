@@ -1,4 +1,6 @@
 import { isWinterTime, timeValue, timeLabel } from '../engine/time-labels';
+import { CubeToolbar, type CubeMode } from './CubeToolbar';
+import { SliceExplorer } from './SliceExplorer';
 import { PanHint } from './PanHint';
 import { insideProjectedFace } from '../render/surface-hit';
 import { pointMarkerIcon } from '../render/point-marker';
@@ -8,7 +10,7 @@ import { OrbitView, OrbitViewport, COORDINATE_SYSTEM, type PickingInfo } from '@
 import { LineLayer, TextLayer, IconLayer } from '@deck.gl/layers';
 import { loadPlaces, placesInRegion, spacedPlaceLabels, type Place } from '../render/places';
 import { webgl2Adapter } from '@luma.gl/webgl';
-import { Plus, Minus, Hand, Box, Type } from 'lucide-react';
+import { Hand } from 'lucide-react';
 import { loadBoundaries, clipSegment, type Segment } from '../render/geography';
 import { WorldMinimap } from './WorldMinimap';
 import { CubeController } from '../render/cube-controller';
@@ -17,7 +19,6 @@ import { VolumeLayer, CUBE_SIZE, normalized } from '../render/volume-layer';
 import type { Palette } from '../render/colors';
 import type { Extent, Volume } from '../engine/types';
 import { coordinateDate } from '../engine/coordinates';
-import { Button, Tip } from './ui/primitives';
 import { draggedRegion } from '../render/region-drag';
 
 export type Point = { x: number; y: number; t: number; value: number };
@@ -51,7 +52,10 @@ export function Cube({
   range,
   palette,
   reset,
+  onReset,
   onPoint,
+  onSlices,
+  onSliceStart,
   onError,
   onReady,
   onRegion,
@@ -67,7 +71,10 @@ export function Cube({
   range: [number, number];
   palette: Palette;
   reset: number;
+  onReset: () => void;
   onPoint: (v: Point) => void;
+  onSlices: (slices: [number, number, number]) => void;
+  onSliceStart: (axis: number) => void;
   onError: (error: Error) => void;
   onReady: () => void;
   onRegion: (extent: Extent) => void;
@@ -294,7 +301,7 @@ export function Cube({
   }, [borders, volume, slices, regionOffset, size]);
 
   const [camera, setCamera] = useState({ ...initial, zoom: -0.8 });
-  const [mode, setMode] = useState<'orbit' | 'pan'>('orbit');
+  const [mode, setMode] = useState<CubeMode>('orbit');
   const [hover, setHover] = useState<Point | null>(null);
   const [overTopFace, setOverTopFace] = useState(false);
   const [cameraDragging, setCameraDragging] = useState(false);
@@ -426,7 +433,11 @@ export function Cube({
     return () => observer.disconnect();
   }, []);
 
-  useEffect(() => setCamera({ ...initial, zoom: fitZoom.current }), [reset]);
+  useEffect(() => {
+    setCamera({ ...initial, zoom: fitZoom.current });
+    setMode('orbit');
+    setHover(null);
+  }, [reset]);
 
   useEffect(() => {
     const el = host.current;
@@ -466,9 +477,9 @@ export function Cube({
       `${Math.abs(v).toFixed(v % 1 ? 2 : 0)}° ${v < 0 ? negative : positive}`;
 
     const projection = new OrbitViewport({
+      ...camera,
       width: 1000,
       height: 1000,
-      ...camera,
       zoom: 0,
       ...cubeProjection,
     });
@@ -566,13 +577,19 @@ export function Cube({
     [volume, points, slices[0], slices[1], size],
   );
 
+  const screenProjection = useMemo(
+    () =>
+      new OrbitViewport({
+        ...camera,
+        ...viewportSize,
+        ...cubeProjection,
+        zoom: camera.zoom + entranceZoom,
+      }),
+    [camera, viewportSize, entranceZoom],
+  );
+
   const visiblePlaceLabels = useMemo(() => {
-    const projection = new OrbitViewport({
-      ...viewportSize,
-      ...camera,
-      ...cubeProjection,
-      zoom: camera.zoom + entranceZoom,
-    });
+    const projection = screenProjection;
 
     return spacedPlaceLabels(
       placeLabels,
@@ -580,15 +597,10 @@ export function Cube({
       viewportSize,
       camera.zoom - fitZoom.current,
     );
-  }, [placeLabels, viewportSize, camera, entranceZoom]);
+  }, [placeLabels, viewportSize, camera.zoom, screenProjection]);
 
   const topFace = useMemo(() => {
-    const projection = new OrbitViewport({
-      ...viewportSize,
-      ...camera,
-      ...cubeProjection,
-      zoom: camera.zoom + entranceZoom,
-    });
+    const projection = screenProjection;
 
     const longitude = volume.lon.map((n) => (n - volume.lon[0] + 360) % 360);
     const west = -size[0] / 2;
@@ -603,7 +615,7 @@ export function Cube({
       [east, north, top],
       [west, north, top],
     ].map((point) => projection.project(point));
-  }, [volume, slices, size, viewportSize, camera, entranceZoom]);
+  }, [volume, slices, size, screenProjection]);
 
   const layers = useMemo(
     () => [
@@ -755,15 +767,20 @@ export function Cube({
       onWheelCapture={stopEntrance}
       onPointerDownCapture={(e) => {
         stopEntrance();
-        if (!e.metaKey || e.button !== 0 || (e.target as HTMLElement).closest('button')) return;
+        if (
+          !e.metaKey ||
+          e.button !== 0 ||
+          (e.target as Element).closest('button, [data-slice-surface], .slice-explorer')
+        )
+          return;
         e.preventDefault();
         e.stopPropagation();
         const r = e.currentTarget.getBoundingClientRect();
 
         const projection = new OrbitViewport({
+          ...camera,
           width: r.width,
           height: r.height,
-          ...camera,
           ...cubeProjection,
         });
 
@@ -792,6 +809,10 @@ export function Cube({
         }
       }}
       onKeyDown={(e) => {
+        if (e.key === 'Escape' && mode === 'slice') {
+          setMode('orbit');
+          return;
+        }
         if (e.target !== e.currentTarget) return;
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           e.preventDefault();
@@ -811,7 +832,7 @@ export function Cube({
           }));
         }
 
-        if (e.key === 'r') setCamera({ ...initial, zoom: fitZoom.current });
+        if (e.key.toLowerCase() === 'r') onReset();
       }}
     >
       <DeckGL
@@ -821,9 +842,12 @@ export function Cube({
         viewState={{ ...camera, zoom: camera.zoom + entranceZoom }}
         onViewStateChange={({ viewState }) =>
           setCamera({
-            ...viewState,
+            ...initial,
+            target: (viewState.target ?? initial.target) as [number, number, number],
+            rotationX: viewState.rotationX ?? initial.rotationX,
+            rotationOrbit: viewState.rotationOrbit ?? initial.rotationOrbit,
             zoom: viewState.zoom - entranceZoom,
-          } as typeof initial)
+          })
         }
         controller={controller}
         layers={layers}
@@ -837,7 +861,7 @@ export function Cube({
         }}
         onClick={(i: PickingInfo, event) => {
           if (event.srcEvent instanceof MouseEvent && event.srcEvent.button !== 0) return;
-          if (i.object && !displayedRegion) onPoint(i.object);
+          if (i.object && !displayedRegion && mode !== 'slice') onPoint(i.object);
         }}
         onDragStart={() => setCameraDragging(true)}
         onDragEnd={() => setCameraDragging(false)}
@@ -847,7 +871,13 @@ export function Cube({
       />
       <PanHint
         active={
-          hoverActive && overTopFace && !loading && !loadError && !regionFailure && !hasPanned
+          mode !== 'slice' &&
+          hoverActive &&
+          overTopFace &&
+          !loading &&
+          !loadError &&
+          !regionFailure &&
+          !hasPanned
         }
         commandHeld={commandHeld}
       />
@@ -869,77 +899,32 @@ export function Cube({
           </span>
         </div>
       )}
+      <SliceExplorer
+        volume={volume}
+        enabled={mode === 'slice'}
+        onExit={() => {
+          setMode('orbit');
+          host.current?.focus();
+        }}
+        onStart={onSliceStart}
+        slices={slices}
+        onChange={onSlices}
+        disabled={loading || Boolean(displayedRegion)}
+        projection={screenProjection}
+      />
       <WorldMinimap extent={displayedRegion || volume.extent} />
-      <div className="camera-tools">
-        {(
-          [
-            { id: 'orbit', label: 'Orbit', icon: <Box size={15} /> },
-            { id: 'pan', label: 'Pan', icon: <Hand size={15} /> },
-          ] as const
-        ).map((item) => (
-          <Tip
-            key={item.id}
-            label={
-              item.id === 'orbit'
-                ? 'Drag to orbit · Cmd-drag to move region · Shift-drag to pan · Scroll to zoom'
-                : 'Drag to pan · Scroll to zoom'
-            }
-          >
-            <Button
-              variant="ghost"
-              className={`icon ${mode === item.id ? 'active' : ''}`}
-              onClick={() => setMode(item.id)}
-              aria-label={item.label}
-            >
-              {item.icon}
-            </Button>
-          </Tip>
-        ))}
-        <i />
-        <Tip label="Reset camera (R)">
-          <Button
-            variant="ghost"
-            className="icon"
-            aria-label="Reset camera"
-            onClick={() => setCamera({ ...initial, zoom: fitZoom.current })}
-          >
-            Reset
-          </Button>
-        </Tip>
-        <Tip label="Zoom in">
-          <Button
-            variant="ghost"
-            className="icon"
-            aria-label="Zoom in"
-            onClick={() => setCamera((c) => ({ ...c, zoom: Math.min(3, c.zoom + 0.2) }))}
-          >
-            <Plus size={16} />
-          </Button>
-        </Tip>
-        <Tip label="Zoom out">
-          <Button
-            variant="ghost"
-            className="icon"
-            aria-label="Zoom out"
-            onClick={() => setCamera((c) => ({ ...c, zoom: Math.max(-2, c.zoom - 0.2) }))}
-          >
-            <Minus size={16} />
-          </Button>
-        </Tip>
-        <i />
-        <Tip label={showLabels ? 'Hide place labels' : 'Show place labels'}>
-          <Button
-            variant="ghost"
-            className={`icon ${showLabels ? 'active' : ''}`}
-            aria-label="Place labels"
-            aria-pressed={showLabels}
-            onClick={toggleLabels}
-          >
-            <Type size={16} />
-          </Button>
-        </Tip>
-      </div>
-      {hover ? (
+      <CubeToolbar
+        mode={mode}
+        onMode={setMode}
+        onReset={onReset}
+        zoom={camera.zoom}
+        onZoom={(step) =>
+          setCamera((c) => ({ ...c, zoom: Math.max(-2, Math.min(3, c.zoom + step)) }))
+        }
+        showLabels={showLabels}
+        onLabels={toggleLabels}
+      />
+      {hover && mode !== 'slice' ? (
         <div className="hover-inspector">
           <span>
             {volume.lon[hover.x]?.toFixed(2)}° E · {volume.lat[hover.y]?.toFixed(2)}° N
