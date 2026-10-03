@@ -1,8 +1,15 @@
+import { loadEnv } from 'vite';
+const snowfallUrl =
+  process.env.VITE_SOURCE_COOP_URL ??
+  loadEnv('development', process.cwd(), 'VITE_').VITE_SOURCE_COOP_URL;
 import { expect, test } from '@playwright/test';
 
 /** Opt-in live integration: validates Source Cooperative CORS, Zstd decoding and real years. */
 test('opens the public snowfall example from Browse datasets', async ({ page }) => {
-  test.skip(!process.env.SNOWFALL_LIVE, 'Set SNOWFALL_LIVE=1 to access the public store.');
+  test.skip(
+    !process.env.SNOWFALL_LIVE || !snowfallUrl,
+    'Set SNOWFALL_LIVE=1 to access the public store.',
+  );
   test.setTimeout(120000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -61,11 +68,14 @@ test('opens the public snowfall example from Browse datasets', async ({ page }) 
 });
 
 test('keeps 2024 SQL matches when the visible winter cut is 1995', async ({ page }) => {
-  test.skip(!process.env.SNOWFALL_LIVE, 'Set SNOWFALL_LIVE=1 to access the public store.');
+  test.skip(
+    !process.env.SNOWFALL_LIVE || !snowfallUrl,
+    'Set SNOWFALL_LIVE=1 to access the public store.',
+  );
   test.setTimeout(120000);
   await page.addInitScript(() => localStorage.setItem('zarr-sql-views-tour-v1', 'seen'));
   const params = new URLSearchParams({
-    dataset: 'https://data.source.coop/alukach/el-nino-snowfall',
+    dataset: snowfallUrl,
     variable: 'winter_anomaly',
     extent: '[-132.2128,22.7492,-97.2128,57.7492]',
   });
@@ -92,11 +102,14 @@ test('keeps 2024 SQL matches when the visible winter cut is 1995', async ({ page
 test('preserves the full cube footprint at the snowfall coverage edge and back', async ({
   page,
 }) => {
-  test.skip(!process.env.SNOWFALL_LIVE, 'Set SNOWFALL_LIVE=1 to access the public store.');
+  test.skip(
+    !process.env.SNOWFALL_LIVE || !snowfallUrl,
+    'Set SNOWFALL_LIVE=1 to access the public store.',
+  );
   test.setTimeout(120000);
   await page.addInitScript(() => localStorage.setItem('zarr-sql-views-tour-v1', 'seen'));
   const params = new URLSearchParams({
-    dataset: 'https://data.source.coop/alukach/el-nino-snowfall',
+    dataset: snowfallUrl,
     variable: 'winter_anomaly',
     extent: '[-55,25,-20,60]',
   });

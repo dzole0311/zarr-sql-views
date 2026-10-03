@@ -302,6 +302,8 @@ export default function App() {
       setCatalogError('');
       setCatalog(null);
       try {
+        if (!options.url)
+          throw Error('Set VITE_DYNAMICAL_CATALOG_URL to enable the dataset catalog.');
         const result = await readCatalog(options.url);
         if (request !== catalogRequest.current) return;
         setCatalogLoading(false);
@@ -917,7 +919,10 @@ export default function App() {
                 <span>{choice.title}</span>
               </button>
             ))}
-            <button onClick={() => open({ url: snowfallExample.url }, snowfallExample.extent)}>
+            <button
+              disabled={!snowfallExample.url}
+              onClick={() => open({ url: snowfallExample.url }, snowfallExample.extent)}
+            >
               <span>{snowfallExample.title}</span>
             </button>
           </div>

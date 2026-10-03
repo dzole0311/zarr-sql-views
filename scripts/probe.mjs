@@ -1,8 +1,15 @@
+import { loadEnv } from 'vite';
+const env = {
+  ...loadEnv(process.env.NODE_ENV || 'development', process.cwd(), 'VITE_'),
+  ...process.env,
+};
+if (!env.VITE_DYNAMICAL_CATALOG_URL)
+  throw Error('Set VITE_DYNAMICAL_CATALOG_URL before running this audit.');
 /** Probe public AIFS metadata and sample chunks; requires network access. */
 import { Repository, Storage } from '@earthmover/icechunk';
 import * as z from 'zarrita';
 const c = await (
-  await fetch('https://stac.dynamical.org/ecmwf-aifs-single-forecast/collection.json')
+  await fetch(new URL('ecmwf-aifs-single-forecast/collection.json', env.VITE_DYNAMICAL_CATALOG_URL))
 ).json();
 const r = await Repository.open(Storage.newHttp(c.assets['icechunk-https'].href));
 const s = await r.readonlySession({ branch: 'main' });

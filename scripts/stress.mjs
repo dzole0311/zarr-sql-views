@@ -1,9 +1,18 @@
+import { loadEnv } from 'vite';
+const env = {
+  ...loadEnv(process.env.NODE_ENV || 'development', process.cwd(), 'VITE_'),
+  ...process.env,
+};
+if (!env.VITE_DYNAMICAL_CATALOG_URL)
+  throw Error('Set VITE_DYNAMICAL_CATALOG_URL before running this audit.');
 /** Measure live store metadata and source-chunk sizes for the documented stress audit. */
 import { Repository, Storage } from '@earthmover/icechunk';
 import * as z from 'zarrita';
 const collections = ['ecmwf-ifs-ens-forecast-15-day-0-25-degree'];
 for (const id of collections) {
-  const doc = await (await fetch(`https://stac.dynamical.org/${id}/collection.json`)).json();
+  const doc = await (
+    await fetch(new URL(`${id}/collection.json`, env.VITE_DYNAMICAL_CATALOG_URL))
+  ).json();
   const repo = await Repository.open(Storage.newHttp(doc.assets['icechunk-https'].href));
   const session = await repo.readonlySession({ branch: 'main' });
   const arr = await z.open(z.root(session.store).resolve('temperature_2m'), { kind: 'array' });

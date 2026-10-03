@@ -1,12 +1,11 @@
+import { dynamicalCatalogUrl, dynamicalDatasetId } from './config';
+
 const availableForecasts = new Set(['ecmwf-aifs-single-forecast', 'noaa-gfs-forecast']);
 
 export function isAvailableForecast(url: string): boolean {
   const parsed = new URL(url);
 
-  return (
-    parsed.hostname === 'stac.dynamical.org' &&
-    availableForecasts.has(parsed.pathname.split('/')[1])
-  );
+  return availableForecasts.has(dynamicalDatasetId(parsed) ?? '');
 }
 
 export function defaultVariable(names: string[]) {
@@ -80,8 +79,8 @@ export function catalogSupport(
   url: string,
 ): { note: string; disabled: boolean; rank: number } | null {
   const parsed = new URL(url);
-  if (parsed.hostname !== 'stac.dynamical.org') return null;
-  const id = parsed.pathname.split('/')[1];
+  const id = dynamicalDatasetId(parsed);
+  if (!id) return null;
   if (checked.has(id)) return { note: 'Sample load verified', disabled: false, rank: 0 };
   if (ensemble.has(id))
     return { note: 'Ensemble member selection not supported yet', disabled: true, rank: 2 };
@@ -102,7 +101,8 @@ export function regularDataset(url: string): { url: string; title: string } | nu
   } catch {
     return null;
   }
-  if (parsed.hostname !== 'stac.dynamical.org') return null;
+  const id = dynamicalDatasetId(parsed);
+  if (!id) return null;
 
   const alternatives: Record<string, [string, string]> = {
     'noaa-gfs-analysis-virtual': ['noaa-gfs-analysis', 'NOAA GFS analysis'],
@@ -114,10 +114,13 @@ export function regularDataset(url: string): { url: string; title: string } | nu
     ],
   };
 
-  const alternative = alternatives[parsed.pathname.split('/')[1]];
+  const alternative = alternatives[id];
 
   return alternative
-    ? { url: `https://stac.dynamical.org/${alternative[0]}/collection.json`, title: alternative[1] }
+    ? {
+        url: new URL(`${alternative[0]}/collection.json`, dynamicalCatalogUrl).href,
+        title: alternative[1],
+      }
     : null;
 }
 

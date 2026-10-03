@@ -1,9 +1,10 @@
+import { sourceCoopUrl } from './config';
 import type { Extent, OpenRequest } from './types';
 
 /** Direct-store example: no STAC document or consolidated metadata is required. */
 export const snowfallExample = {
   title: 'El Niño snowfall',
-  url: 'https://data.source.coop/alukach/el-nino-snowfall',
+  url: sourceCoopUrl,
   variable: 'winter_anomaly',
   variables: [
     'anomaly',
@@ -18,7 +19,7 @@ export const snowfallExample = {
 };
 
 export function isSnowfallExample(url: string) {
-  return url.replace(/\/$/, '') === snowfallExample.url;
+  return !!snowfallExample.url && url.replace(/\/$/, '') === snowfallExample.url;
 }
 
 export function exampleOptions(options: OpenRequest): OpenRequest {

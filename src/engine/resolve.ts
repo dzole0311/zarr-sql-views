@@ -1,6 +1,6 @@
 import { readDatacube, type Datacube } from './datacube';
 
-export const AIFS = 'https://stac.dynamical.org/catalog.json';
+export { dynamicalCatalogUrl as AIFS } from './config';
 
 /** Normalize public store URLs; reject credentials before converting S3 paths. */
 export function normalizeUrl(input: string) {

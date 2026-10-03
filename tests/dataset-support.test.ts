@@ -27,10 +27,10 @@ it('selects precipitation instead of an incidental quality or category variable'
 });
 it('blocks known unsupported grid and virtual cloud formats', () => {
   expect(
-    catalogSupport('https://stac.dynamical.org/eccc-hrdps-forecast/collection.json')?.disabled,
+    catalogSupport('https://catalog.example.test/eccc-hrdps-forecast/collection.json')?.disabled,
   ).toBe(true);
   expect(
-    catalogSupport('https://stac.dynamical.org/noaa-gfs-analysis-virtual/collection.json')
+    catalogSupport('https://catalog.example.test/noaa-gfs-analysis-virtual/collection.json')
       ?.disabled,
   ).toBe(true);
   expect(catalogSupport('https://example.com/noaa-gfs-analysis/collection.json')).toBeNull();

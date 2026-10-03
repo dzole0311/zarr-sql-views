@@ -1,3 +1,7 @@
+import { loadEnv } from 'vite';
+const snowfallUrl =
+  process.env.VITE_SOURCE_COOP_URL ??
+  loadEnv('development', process.cwd(), 'VITE_').VITE_SOURCE_COOP_URL;
 import { expect, test } from '@playwright/test';
 
 /** Serve a deterministic uncompressed Zarr v2 store through the real data worker. */
@@ -211,10 +215,16 @@ test('opens a snowfall URL without a variable and preserves calendar years in SQ
   page,
   context,
 }) => {
+  test.skip(!snowfallUrl, 'Set VITE_SOURCE_COOP_URL to enable the snowfall example.');
   const files = fixtureStore('snowfall');
   await page.addInitScript(() => localStorage.setItem('zarr-sql-views-tour-v1', 'seen'));
-  await context.route('https://data.source.coop/alukach/el-nino-snowfall/**', async (route) => {
-    const data = files.get(new URL(route.request().url()).pathname.split('/el-nino-snowfall/')[1]);
+  await context.route(`${snowfallUrl}/**`, async (route) => {
+    const data = files.get(
+      route
+        .request()
+        .url()
+        .slice(snowfallUrl.replace(/\/$/, '').length + 1),
+    );
     await route.fulfill({
       status: data === undefined ? 404 : 200,
       body: data ?? '',
@@ -223,7 +233,7 @@ test('opens a snowfall URL without a variable and preserves calendar years in SQ
     });
   });
   const params = new URLSearchParams({
-    dataset: 'https://data.source.coop/alukach/el-nino-snowfall',
+    dataset: snowfallUrl,
     extent: '[0,40,2,42]',
   });
   await page.goto(`/?${params}`);

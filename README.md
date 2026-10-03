@@ -8,8 +8,11 @@ Requires Node.js 22.13 or newer.
 
 ```sh
 npm install
+cp .env.example .env.local
 npm run dev
 ```
+
+Set the dataset URLs in `.env.local` before starting Vite.
 
 Open the local URL printed in your terminal.
 
